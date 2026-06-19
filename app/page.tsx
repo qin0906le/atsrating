@@ -37,6 +37,40 @@ interface Analysis {
   rewriteSuggestions?: RewriteSuggestion[];
 }
 
+type Provider = "anthropic" | "gemini";
+
+async function runAnthropic(apiKey: string, prompt: string): Promise<string> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2500,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response");
+  return content.text;
+}
+
+async function runGemini(apiKey: string, prompt: string): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 2500 },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: { message?: string } }).error?.message ?? `Gemini error ${res.status}`);
+  }
+  const data = await res.json() as { candidates?: { content: { parts: { text: string }[] } }[] };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Empty response from Gemini");
+  return text;
+}
+
 async function extractTextFromFile(file: File): Promise<string> {
   if (file.type === "application/pdf") {
     const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
@@ -106,6 +140,7 @@ function CategoryBar({ category }: { category: Category }) {
 }
 
 export default function Home() {
+  const [provider, setProvider] = useState<Provider>("anthropic");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -138,7 +173,6 @@ export default function Home() {
       const resumeText = await extractTextFromFile(file);
       if (!resumeText.trim()) throw new Error("Could not extract text from file");
 
-      const client = new Anthropic({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
       const hasJD = jobDescription.trim().length > 0;
 
       const jdSection = hasJD
@@ -181,15 +215,11 @@ Return ONLY valid JSON with no markdown fences:
   ]
 }`;
 
-      const message = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2500,
-        messages: [{ role: "user", content: prompt }],
-      });
+      const responseText = provider === "gemini"
+        ? await runGemini(apiKey.trim(), prompt)
+        : await runAnthropic(apiKey.trim(), prompt);
 
-      const content = message.content[0];
-      if (content.type !== "text") throw new Error("Unexpected response");
-      const raw = content.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      const raw = responseText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
       setAnalysis(JSON.parse(raw));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Analysis failed");
@@ -240,15 +270,39 @@ Return ONLY valid JSON with no markdown fences:
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm font-bold">ATS</div>
           <h1 className="text-xl font-bold">Resume ATS Rater</h1>
-          <span className="ml-auto text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">Powered by Claude AI</span>
+          <span className="ml-auto text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">Claude &amp; Gemini</span>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* API Key */}
+        {/* AI Provider */}
         <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-300 mb-2">AI Model</label>
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => { setProvider("anthropic"); setApiKey(""); setAnalysis(null); setError(null); }}
+              className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                provider === "anthropic"
+                  ? "bg-blue-600 border-blue-500 text-white"
+                  : "bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400"
+              }`}
+            >
+              Claude Haiku <span className="opacity-70 text-xs">(Anthropic)</span>
+            </button>
+            <button
+              onClick={() => { setProvider("gemini"); setApiKey(""); setAnalysis(null); setError(null); }}
+              className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                provider === "gemini"
+                  ? "bg-blue-600 border-blue-500 text-white"
+                  : "bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400"
+              }`}
+            >
+              Gemini 2.0 Flash <span className="opacity-70 text-xs">(Google · free)</span>
+            </button>
+          </div>
+
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Anthropic API Key <span className="text-red-400">*</span>
+            {provider === "gemini" ? "Google Gemini" : "Anthropic"} API Key <span className="text-red-400">*</span>
             <span className="text-slate-500 font-normal ml-1">— never stored, used only in your browser</span>
           </label>
           <div className="relative">
@@ -256,7 +310,7 @@ Return ONLY valid JSON with no markdown fences:
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
+              placeholder={provider === "gemini" ? "AIza... or AQ..." : "sk-ant-..."}
               className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 pr-12 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
             <button onClick={() => setShowKey((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs">
@@ -264,8 +318,12 @@ Return ONLY valid JSON with no markdown fences:
             </button>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Get your key at{" "}
-            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">console.anthropic.com</a>
+            Get your {provider === "gemini" ? "free " : ""}key at{" "}
+            {provider === "gemini" ? (
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
+            ) : (
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">console.anthropic.com</a>
+            )}
           </p>
         </div>
 
@@ -324,7 +382,7 @@ Return ONLY valid JSON with no markdown fences:
               </svg>
               Analyzing your resume...
             </>
-          ) : "Analyze ATS Score"}
+          ) : `Analyze ATS Score · ${provider === "gemini" ? "Gemini" : "Claude"}`}
         </button>
 
         {error && (
