@@ -24,8 +24,8 @@ interface Analysis {
 
 async function extractTextFromFile(file: File): Promise<string> {
   if (file.type === "application/pdf") {
-    const { getDocument, GlobalWorkerOptions, version } = await import("pdfjs-dist");
-    GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+    const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
+    GlobalWorkerOptions.workerSrc = "/atsrating/pdf.worker.min.mjs";
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await getDocument({ data: arrayBuffer }).promise;
     let text = "";
