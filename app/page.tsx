@@ -51,8 +51,15 @@ async function runAnthropic(apiKey: string, prompt: string): Promise<string> {
   return content.text;
 }
 
-async function runGemini(apiKey: string, prompt: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+const GEMINI_MODELS = [
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.5-flash",
+  "gemini-1.5-flash-8b",
+];
+
+async function runGemini(apiKey: string, model: string, prompt: string): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -141,6 +148,7 @@ function CategoryBar({ category }: { category: Category }) {
 
 export default function Home() {
   const [provider, setProvider] = useState<Provider>("anthropic");
+  const [geminiModel, setGeminiModel] = useState(GEMINI_MODELS[0]);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -216,7 +224,7 @@ Return ONLY valid JSON with no markdown fences:
 }`;
 
       const responseText = provider === "gemini"
-        ? await runGemini(apiKey.trim(), prompt)
+        ? await runGemini(apiKey.trim(), geminiModel, prompt)
         : await runAnthropic(apiKey.trim(), prompt);
 
       const raw = responseText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -297,9 +305,27 @@ Return ONLY valid JSON with no markdown fences:
                   : "bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400"
               }`}
             >
-              Gemini 2.0 Flash <span className="opacity-70 text-xs">(Google · free)</span>
+              Gemini Flash <span className="opacity-70 text-xs">(Google · free)</span>
             </button>
           </div>
+
+          {provider === "gemini" && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Gemini Model</label>
+              <select
+                value={geminiModel}
+                onChange={(e) => setGeminiModel(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                {GEMINI_MODELS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                If you hit a “quota exceeded / limit: 0” error, try <span className="text-slate-300">gemini-1.5-flash</span> — its free tier is available in more regions.
+              </p>
+            </div>
+          )}
 
           <label className="block text-sm font-medium text-slate-300 mb-2">
             {provider === "gemini" ? "Google Gemini" : "Anthropic"} API Key <span className="text-red-400">*</span>
