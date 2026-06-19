@@ -156,7 +156,8 @@ Return ONLY valid JSON (no markdown):
 
       const content = message.content[0];
       if (content.type !== "text") throw new Error("Unexpected response");
-      setAnalysis(JSON.parse(content.text));
+      const raw = content.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      setAnalysis(JSON.parse(raw));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
