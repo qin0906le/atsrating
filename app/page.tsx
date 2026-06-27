@@ -16,11 +16,6 @@ interface JdKeyword {
   found: boolean;
 }
 
-interface RewriteSuggestion {
-  original: string;
-  improved: string;
-}
-
 interface Analysis {
   overallScore: number;
   grade: string;
@@ -30,11 +25,8 @@ interface Analysis {
   improvements: string[];
   missingKeywords: string[];
   tip: string;
-  // Feature 1: JD matcher
   jdMatchScore?: number;
   jdKeywords?: JdKeyword[];
-  // Feature 2: bullet rewriter
-  rewriteSuggestions?: RewriteSuggestion[];
 }
 
 type Provider = "anthropic" | "gemini";
@@ -187,12 +179,12 @@ export default function Home() {
         ? `\n\n**Job Description:**\n${jobDescription}`
         : "\n\n**No job description provided — analyze for general ATS best practices.**";
 
-      const jdKeywordInstruction = hasJD ? `
+      const jdKeywordInstruction = hasJD ? `,
   "jdMatchScore": <0-100 percentage of JD keywords found in resume>,
   "jdKeywords": [
     {"keyword": "<important keyword/phrase from JD>", "found": <true if present in resume, else false>}
     ... (list 12-16 important keywords from the JD)
-  ],` : "";
+  ]` : "";
 
       const prompt = `You are an expert ATS (Applicant Tracking System) resume analyst. Analyze the resume below and return a comprehensive JSON report.${jdSection}
 
@@ -215,12 +207,7 @@ Return ONLY valid JSON with no markdown fences:
   "strengths": ["<s1>", "<s2>", "<s3>"],
   "improvements": ["<i1>", "<i2>", "<i3>", "<i4>"],
   "missingKeywords": ["<k1>", "<k2>", "<k3>"],
-  "tip": "<one actionable tip>",${jdKeywordInstruction}
-  "rewriteSuggestions": [
-    {"original": "<exact weak bullet point from resume>", "improved": "<ATS-optimized rewrite with action verb + metric>"},
-    {"original": "<exact weak bullet point from resume>", "improved": "<ATS-optimized rewrite with action verb + metric>"},
-    {"original": "<exact weak bullet point from resume>", "improved": "<ATS-optimized rewrite with action verb + metric>"}
-  ]
+  "tip": "<one actionable tip>"${jdKeywordInstruction}
 }`;
 
       const responseText = provider === "gemini"
@@ -537,29 +524,7 @@ Return ONLY valid JSON with no markdown fences:
                 </div>
               )}
 
-              {/* Feature 2: Bullet Rewriter */}
-              {analysis.rewriteSuggestions && analysis.rewriteSuggestions.length > 0 && (
-                <div className="bg-slate-800 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold mb-2">Bullet Point Rewrites</h3>
-                  <p className="text-xs text-slate-400 mb-5">Stronger versions of your existing bullet points — action verb + measurable impact format.</p>
-                  <div className="space-y-4">
-                    {analysis.rewriteSuggestions.map((s, i) => (
-                      <div key={i} className="rounded-xl overflow-hidden border border-slate-700">
-                        <div className="bg-red-900/20 px-4 py-3 border-b border-slate-700">
-                          <p className="text-xs text-red-400 font-semibold uppercase tracking-wide mb-1">Before</p>
-                          <p className="text-sm text-slate-300">{s.original}</p>
-                        </div>
-                        <div className="bg-green-900/20 px-4 py-3">
-                          <p className="text-xs text-green-400 font-semibold uppercase tracking-wide mb-1">After</p>
-                          <p className="text-sm text-slate-200 font-medium">{s.improved}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="text-center text-xs text-slate-600 pb-4">
+<p className="text-center text-xs text-slate-600 pb-4">
                 Analysis by Claude AI · Results are estimates based on common ATS patterns
               </p>
             </div>
