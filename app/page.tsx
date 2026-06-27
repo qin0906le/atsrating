@@ -235,16 +235,13 @@ Return ONLY valid JSON with no markdown fences:
         useCORS: true,
       });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let yOffset = 0;
-      while (yOffset < pdfHeight) {
-        if (yOffset > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, -yOffset, pdfWidth, pdfHeight);
-        yOffset += pageHeight;
-      }
+      // Single page sized to the full content so nothing is cut across page breaks
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
       pdf.save(`ats-report-${file?.name ?? "resume"}.pdf`);
     } catch (err) {
       console.error("PDF export failed", err);
