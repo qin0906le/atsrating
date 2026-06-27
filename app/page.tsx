@@ -43,7 +43,7 @@ async function runAnthropic(apiKey: string, prompt: string): Promise<string> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 2500,
+    max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   });
   const content = message.content[0];
@@ -65,7 +65,7 @@ async function runGemini(apiKey: string, model: string, prompt: string): Promise
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2500 },
+      generationConfig: { maxOutputTokens: 4096 },
     }),
   });
   if (!res.ok) {
