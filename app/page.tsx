@@ -227,7 +227,7 @@ Return ONLY valid JSON with no markdown fences:
     if (!reportRef.current || !analysis) return;
     setLoadingPdf(true);
     try {
-      const { default: html2canvas } = await import("html2canvas");
+      const { default: html2canvas } = await import("html2canvas-pro");
       const { jsPDF } = await import("jspdf");
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
@@ -248,6 +248,7 @@ Return ONLY valid JSON with no markdown fences:
       pdf.save(`ats-report-${file?.name ?? "resume"}.pdf`);
     } catch (err) {
       console.error("PDF export failed", err);
+      setError(err instanceof Error ? `PDF export failed: ${err.message}` : "PDF export failed");
     } finally {
       setLoadingPdf(false);
     }
